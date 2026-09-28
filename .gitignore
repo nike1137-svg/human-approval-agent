@@ -1,0 +1,29 @@
+# 비밀정보
+.env
+.env.*
+!.env.example
+
+# 가상환경 · 패키지
+.venv/
+venv/
+node_modules/
+
+# 파이썬 부산물
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 실행 산출물 — 데모 상태(업무 보드 · 체크포인트) · 비용 장부 · 그래프 ① 기록은 빼고,
+# 측정 원본은 넣는다 (키 없이 REPORT 숫자를 다시 내려면: python -m evaluation.measure --다시채점)
+output/*
+!output/measure/
+!output/measure_v2/
+!output/measure_v3/
+!output/measure_v3_final/
+
+# 기타
+.DS_Store
+Thumbs.db
+
+# Claude Code 기기별 설정 (실행 경로가 이 컴퓨터 기준)
+.claude/

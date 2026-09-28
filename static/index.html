@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회의록 할 일 승인</title>
+<link rel="icon" href="data:,">  <!-- 탭 아이콘 없음 — 브라우저가 /favicon.ico 를 찾다 404 를 내지 않게 -->
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+/* 색 규칙 (09-29 정리): 바탕은 무채색 · 강조는 파랑 하나 · 상태는 초록(자동) · 주황(사람이 볼 건) 둘만 · 빨강은 반려 · 오류에만 */
+:root{--bg:#15181d;--panel:#1c2026;--panel2:#232830;--line:#2c323b;--text:#e6e9ee;--muted:#8d96a2;--faint:#5f6874;--accent:#5aa9d6;
+--ok:#5bb58c;--okbg:rgba(91,181,140,.12);--warn:#d9a441;--warnbg:rgba(217,164,65,.12);--bad:#d8665a;--badbg:rgba(216,102,90,.12);--radius:10px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+header{display:flex;align-items:center;gap:18px;padding:12px 22px;background:#101318;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;font-weight:700;white-space:nowrap}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:none;border:1px solid transparent;color:var(--muted);padding:6px 14px;border-radius:999px;font:inherit;cursor:pointer}
+nav button.on{background:var(--text);color:#111;font-weight:700}
+nav .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--warn);color:#1a1206;font-size:12px;font-weight:700;text-align:center}
+main{padding:28px 24px;max-width:1240px;margin:0 auto}
+section{display:none}section.on{display:block}
+h2{font-size:22px;margin:0 0 4px;font-weight:700}h3{font-size:15px;margin:0;color:var(--text);font-weight:700}
+.sub{color:var(--muted);margin:0 0 22px;font-size:15px}
+.small{font-size:13px;color:var(--faint)}
+.m{color:var(--muted);font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 16px;border-radius:8px;font:inherit;font-size:15px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:5px 12px;font-size:14px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#07131b;font-weight:700}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#06140d;font-weight:700}
+.btn.bad{background:none;border-color:var(--line);color:var(--bad);font-weight:700}
+.btn.bad:hover{border-color:var(--bad)}
+.btn.quiet{background:none;border-color:var(--line);color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.card .id{font-weight:700}.card .meta{color:var(--muted);font-size:14px;margin-top:2px}
+.chip{display:inline-block;padding:0 8px;border-radius:6px;font-size:12.5px;line-height:22px;background:var(--panel2);color:var(--muted);margin:2px 4px 2px 0;white-space:nowrap}
+.chip.auto{background:var(--okbg);color:var(--ok)}.chip.stop{background:var(--warnbg);color:var(--warn)}.chip.bad{background:var(--badbg);color:var(--bad)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--faint)}
+.dot.auto{background:var(--ok)}.dot.stop{background:var(--warn)}.dot.bad{background:var(--bad)}
+.inbox{display:grid;grid-template-columns:340px 1fr;gap:18px}
+@media (max-width:900px){.inbox{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 200px);overflow:auto;padding-right:4px}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;cursor:pointer}
+.item:hover{border-color:#3a414b}
+.item.on{border-color:var(--accent)}
+.item .t{font-weight:700;font-size:15px;line-height:1.45}.item .m{font-size:13px;margin-top:2px}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#33475a;color:#fff;font-size:12px;font-weight:700;margin-right:6px;vertical-align:middle}
+.avatar.none{background:var(--warnbg);color:var(--warn)}
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px}
+.blk{border-top:1px solid var(--line);padding:16px 0}.blk:first-of-type{border-top:0;padding-top:0}
+.blk .k{font-size:13px;color:var(--muted);font-weight:700;margin-bottom:8px}
+.why{padding:6px 0 6px 12px;border-left:3px solid var(--warn);margin:6px 0}
+.why .w{color:var(--muted);font-size:14px}
+.rel{padding:6px 0 6px 12px;border-left:3px solid var(--line);margin:6px 0;font-size:14px}
+.quote{background:#11151a;border-left:3px solid var(--accent);padding:8px 12px;border-radius:0 6px 6px 0;margin:4px 0}
+.ctx{max-height:220px;overflow:auto;background:#11151a;border-radius:8px;padding:8px 10px;margin-top:8px;font-size:14px}
+.ctx div{padding:2px 6px;color:var(--muted)}.ctx div.hit{color:var(--text);background:#1d2c38;border-radius:4px}
+.judge{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:baseline}
+.judge span{color:var(--muted);font-size:14px}.judge b{font-size:16px}
+.q{display:flex;gap:10px;align-items:baseline;margin:3px 0;font-size:14px}.q .y{color:var(--ok);font-weight:700}.q .n{color:var(--warn);font-weight:700}
+.effect{margin-top:12px;padding:10px 14px;border-radius:8px;background:var(--panel2);border-left:3px solid var(--ok);font-size:15px}
+.effect.none{border-left-color:var(--warn)}
+.tag{display:inline-block;padding:0 7px;border-radius:5px;font-size:12px;line-height:20px;background:var(--warnbg);color:var(--warn);margin-right:6px;font-weight:700;vertical-align:1px}
+.form{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:12px;display:none}
+.form.on{display:block}
+details>summary{cursor:pointer;list-style:none}details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"▸ ";color:var(--faint)}details[open]>summary::before{content:"▾ "}
+label{display:block;font-size:14px;color:var(--muted);margin:8px 0 4px}
+input,select,textarea{width:100%;background:#11151a;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px 10px;font:inherit}
+textarea{min-height:64px;resize:vertical}
+.err{color:var(--bad);font-size:13px;margin-top:4px;min-height:1em}
+.empty{color:var(--muted);text-align:center;padding:40px 10px;background:var(--panel);border:1px dashed var(--line);border-radius:var(--radius)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:6px 0 26px}
+@media (max-width:700px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.tile .n{font-size:30px;font-weight:700;line-height:1.2}.tile .l{color:var(--muted);font-size:14px}.tile .s{color:var(--faint);font-size:13px;margin-top:2px}
+.tile.auto .n{color:var(--ok)}.tile.stop .n{color:var(--warn)}
+.sect{margin:0 0 22px}.sect>summary{padding:8px 0}.sect>summary .small{margin-left:8px}
+.scroll{max-height:380px;overflow:auto;border-radius:var(--radius);border:1px solid var(--line);margin-top:6px}
+table{width:100%;border-collapse:collapse;background:var(--panel);font-size:14px}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;background:var(--panel2);position:sticky;top:0}
+td.nw,th.nw{white-space:nowrap}
+.room{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
+@media (max-width:900px){.room{grid-template-columns:1fr}}
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.step .h{font-weight:700;margin-bottom:6px}.step .h small{color:var(--muted);font-weight:400;margin-left:6px}
+.line{padding:3px 8px;border-radius:4px;font-size:14px}.line .chip{font-size:12px;margin-right:6px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0d1116;border:1px solid var(--line);padding:10px 18px;border-radius:8px;display:none;z-index:9;max-width:90vw}
+#toast.bad{border-color:var(--bad);color:#ffd7d2}
+/* 공개 데모 (서버를 DEMO_PUBLIC=1 로 켰을 때) — 상태를 지우거나 키를 쓰는 버튼은 숨긴다 */
+body.public #reset, body.public #expire, body.public #keyNote, body.public .keyBtn{display:none}
+#publicNote{display:none}body.public #publicNote{display:block}
+</style>
+</head>
+<body>
+<header>
+  <h1>회의록 할 일 · 사람 승인</h1>
+  <nav>
+    <button data-tab="meetings" class="on">① 회의록</button>
+    <button data-tab="room">② 회의실</button>
+    <button data-tab="inbox">③ 승인함<span class="badge" id="badge">0</span></button>
+    <button data-tab="results">④ 결과</button>
+  </nav>
+</header>
+<main>
+  <section id="meetings" class="on">
+    <h2 id="meetingsTitle">시니어 AI 교육 프로그램 · 회의록</h2>
+    <p class="sub">회의록에서 할 일을 뽑아 업무 보드에 등록하고 담당자에게 알립니다. 위험한 할 일만 멈춰서 ③ 승인함으로 갑니다.</p>
+    <div class="row">
+      <button class="btn pri" id="fillDemo">시연 자료로 채우기 (키 없이)</button>
+      <button class="btn quiet" id="reset">처음 상태로</button>
+    </div>
+    <p class="small" id="publicNote" style="margin:8px 0 0">공개 데모입니다 — 저장해 둔 자료로 보여 주며 AI 를 새로 부르지 않습니다. 승인 · 반려는 눌러 볼 수 있고, 들어온 모든 사람이 같은 상태를 봅니다.</p>
+    <p class="small" id="keyNote" style="margin:8px 0 0">「새로 처리」 는 .env 의 OpenAI 키로 회의록을 새로 처리합니다 (한 편에 30초 안팎)</p>
+    <div class="cards" id="meetingCards"></div>
+  </section>
+
+  <section id="room">
+    <div class="row" style="justify-content:space-between"><div><h2 id="roomTitle">회의실</h2><p class="sub" id="roomSub">회의록을 고르면 에이전트가 무엇을 했는지 보여 줍니다.</p></div>
+      <select id="roomSelect" style="width:auto" aria-label="회의록 고르기"></select></div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px">
+      <div id="stage3d" style="position:relative;height:440px"></div>
+      <div class="row" style="padding:10px 14px;border-top:1px solid var(--line)">
+        <button class="btn pri sm" id="play">▶ 재생</button><button class="btn sm" id="pause">일시정지</button>
+        <button class="btn sm" id="speed">1배</button><button class="btn sm" id="skip">끝으로</button>
+        <span class="small" style="margin-left:auto"><span class="dot auto"></span>자동 등록 <span class="dot stop" style="margin-left:10px"></span>사람이 볼 건 <span class="dot" style="margin-left:10px"></span>반려 · 끌어서 둘러보기</span>
+      </div>
+    </div>
+    <details class="sect"><summary><h3 style="display:inline">진행 기록 자세히</h3><span class="small">줄마다 분류 · 단계별 처리</span></summary>
+      <div class="room"><div class="card"><h3 style="margin-bottom:8px">회의록 — 줄마다 분류 (라우팅)</h3><div id="roomLines"></div></div>
+        <div class="steps" id="roomSteps"></div></div>
+    </details>
+  </section>
+
+  <section id="inbox">
+    <div class="row" style="justify-content:space-between">
+      <div><h2>승인함</h2><p class="sub">기준에 걸려 멈춘 할 일입니다 (오래된 것부터). 답을 주면 멈춘 자리부터 이어서 등록하거나 반려합니다.</p></div>
+      <button class="btn quiet sm" id="expire" title="3일 넘게 대기한 건을 자동 반려하고 주최자(도윤)에게 알립니다">대기 3일 넘긴 건 처리</button>
+    </div>
+    <div class="inbox"><div class="list" id="pendingList"></div><div id="pendingDetail"></div></div>
+  </section>
+
+  <section id="results">
+    <h2>결과</h2><p class="sub">몇 건을 처리해 몇 건이 멈췄고, 사람이 어떻게 처리했나</p>
+    <div class="tiles" id="tiles"></div>
+    <details class="sect" open><summary><h3 style="display:inline">업무 보드</h3><span class="small" id="boardCnt">바깥으로 나간 결과</span></summary><div class="scroll"><table id="boardTbl"></table></div></details>
+    <details class="sect" open><summary><h3 style="display:inline">사람의 답 기록</h3><span class="small" id="decCnt"></span></summary><div class="scroll"><table id="decTbl"></table></div></details>
+    <details class="sect" open><summary><h3 style="display:inline">반려 사유 모음</h3><span class="small">어느 규칙에서 멈춘 건을 왜 반려했나 — 기준을 고칠 재료</span></summary><div class="scroll"><table id="rejTbl"></table></div></details>
+    <details class="sect"><summary><h3 style="display:inline">담당자에게 간 알림</h3><span class="small" id="outCnt">되돌릴 수 없는 것</span></summary><div class="scroll"><table id="outTbl"></table></div></details>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const 규칙 = {};
+let 선택 = null, 대기 = [];
+
+function toast(말, 나쁨=false){const t=$("#toast");t.textContent=말;t.className=나쁨?"bad":"";t.style.display="block";clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",4200)}
+async function api(주소, 설정={}){
+  const r = await fetch(주소, {headers:{"Content-Type":"application/json"}, ...설정});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.detail || `오류 ${r.status}`);
+  return j;
+}
+function 얼굴(이름){return 이름 ? `<span class="avatar">${esc(이름[0])}</span>${esc(이름)}` : `<span class="avatar none">?</span><span style="color:var(--warn)">담당자 없음</span>`}
+// 규칙 칩은 색 없이 번호만 (뜻은 마우스를 올리면) — 뜻 · 위험은 승인 화면 「왜 멈췄나」 에서 글로 보여 준다
+function 칩(규){const r=규칙[규];return `<span class="chip" title="${esc(r?`${r["뜻"]} — ${r["막으려는 위험"]}`:"")}">${esc(규)}</span>`}
+function 칩들(목록, 최대=3){return 목록.slice(0,최대).map(칩).join("") + (목록.length>최대?`<span class="chip">+${목록.length-최대}</span>`:"")}
+const 후보머리말 = /^\(할 일 후보 · 뽑기에서 빠짐\)\s*/;
+function 할일이름(s){return esc(String(s||"").replace(후보머리말,""))}
+function 후보표(s){return 후보머리말.test(String(s||"")) ? '<span class="tag">후보</span>' : ""}
+
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>보기(b.dataset.tab));
+function 보기(탭){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===탭));
+  document.querySelectorAll("section").forEach(s=>s.classList.toggle("on", s.id===탭));
+  ({meetings:회의록그리기, room:회의실그리기, inbox:승인함그리기, results:결과그리기})[탭]();
+}
+
+async function 배지(){try{대기=await api("/api/pending");$("#badge").textContent=대기.length;$("#badge").style.display=대기.length?"inline-block":"none"}catch(e){}}
+
+/* ① 회의록 */
+async function 회의록그리기(){
+  const 목록 = await api("/api/meetings");
+  $("#meetingsTitle").textContent = `시니어 AI 교육 프로그램 · 회의록 ${목록.length}편`;
+  $("#meetingCards").innerHTML = 목록.map(m=>`<div class="card">
+    <div class="id">${m.id} ${esc(m.제목)}</div>
+    <div class="meta">${m.회의일} · ${m.참석자.map(esc).join(", ")}</div>
+    <div class="m" style="margin:10px 0 12px">${m.처리됨 ? `할 일 ${m.할일수}건${m.대기수?` · <span style="color:var(--warn)">대기 ${m.대기수}</span>`:" · 대기 없음"}` : `<span class="small">처리 전</span>`}</div>
+    <div class="row"><button class="btn sm" onclick="회의실열기('${m.id}')">회의실에서 보기</button>
+      ${m.처리됨?"":`<button class="btn sm quiet keyBtn" onclick="새로처리('${m.id}', this)">새로 처리 (키)</button>`}</div></div>`).join("");
+  배지();
+}
+$("#fillDemo").onclick = async ()=>{try{const r=await api("/api/fill-demo",{method:"POST"});const n=Object.values(r.처리).flat().length;
+  toast(n?`${Object.keys(r.처리).length}편 · 할 일 ${n}건을 처리했습니다. 멈춘 건은 ③ 승인함에 있습니다.`:"이미 모두 처리되어 있습니다.");회의록그리기()}catch(e){toast(e.message,true)}};
+$("#reset").onclick = async ()=>{if(!confirm("업무 보드 · 알림 · 사람의 답 · 대기 목록을 모두 지우고 처음 상태로 돌립니다. 회의록과 정답은 그대로입니다. 계속할까요?"))return;
+  await api("/api/reset",{method:"POST"});toast("처음 상태로 돌렸습니다.");회의록그리기()};
+async function 새로처리(mid, 버튼){버튼.disabled=true;버튼.textContent="처리 중… (30초 안팎)";
+  try{const r=await api(`/api/process/${mid}`,{method:"POST"});toast(`${mid}: 할 일 ${r.처리.length}건 · 대기 ${r.처리.filter(x=>x[1]==="대기").length}건`);회의실열기(mid)}
+  catch(e){toast(e.message,true);버튼.disabled=false;버튼.textContent="새로 처리 (키)"}}
+
+/* ② 회의실 (2D 진행 기록) */
+let 방 = "M1";
+function 회의실열기(mid){방=mid;보기("room")}
+async function 회의실그리기(){
+  const 목록 = await api("/api/meetings");
+  $("#roomSelect").innerHTML = 목록.map(m=>`<option value="${m.id}" ${m.id===방?"selected":""}>${m.id} · ${esc(m.제목)}</option>`).join("");
+  $("#roomSelect").onchange = e=>{방=e.target.value;회의실그리기()};
+  const d = await api(`/api/meetings/${방}`);
+  if (window.회의실3D) { 회의실3D.무대($("#stage3d")); 회의실3D.불러오기(d); }
+  $("#roomTitle").textContent = `회의실 · ${d.id} ${d.제목}`;
+  $("#roomSub").textContent = `${d.회의일} · 참석 ${d.참석자.join(", ")} · ${d.역할}`;
+  const 분류 = {}; (d.진행?.분류||[]).forEach(x=>분류[x.번호]=x.종류);
+  const 색 = {할일:"auto",조건부:"",끝난일:"",미확정:"",보고:"",잡담:""};
+  $("#roomLines").innerHTML = d.줄들.map((l,i)=>`<div class="line">${분류[i+1]?`<span class="chip tag ${색[분류[i+1]]}">${분류[i+1]}</span>`:""}${esc(l)}</div>`).join("");
+  if(!d.진행){$("#roomSteps").innerHTML=`<div class="empty">아직 처리하지 않은 회의록입니다.<br>① 회의록에서 「시연 자료로 채우기」 나 「새로 처리」 를 누르세요.</div>`;return}
+  const 세기 = {}; d.진행.분류.forEach(x=>세기[x.종류]=(세기[x.종류]||0)+1);
+  const 할일 = d.진행.할일, 자동 = 할일.filter(t=>!t.걸린규칙.length), 멈춤 = 할일.filter(t=>t.걸린규칙.length);
+  $("#roomSteps").innerHTML = `
+    <div class="step"><div class="h">1 줄 분류 <small>라우팅 · LLM</small></div>${Object.entries(세기).map(([k,v])=>`<span class="chip">${k} ${v}</span>`).join("")}</div>
+    <div class="step"><div class="h">2 할 일 뽑기 <small>그라운딩 · 날짜 도구를 LLM 이 스스로 호출</small></div>
+      ${(d.진행.도구기록||[]).map(x=>`<div class="m">「${esc(x.표현)}」 → ${x.날짜||"날짜로 정할 수 없음"}</div>`).join("")||'<div class="m">날짜 도구 호출 없음</div>'}</div>
+    <div class="step"><div class="h">3 정리 · 대조 · 검수 + 가드레일 <small>정리 = 마감을 날짜 도구로 다시 계산 · 대조 = 같은 일 두 번(LLM) · 검수 = 네 질문(LLM) · 규칙은 코드로</small></div>
+      <div class="m" style="margin-bottom:6px">할 일 ${할일.length}건 → <span style="color:var(--ok)">자동 등록 ${자동.length}</span> · <span style="color:var(--warn)">사람이 볼 건 ${멈춤.length}</span></div>
+      ${할일.map(t=>`<div style="padding:7px 0;border-top:1px solid var(--line)">
+        <span class="dot ${t.걸린규칙.length?"stop":"auto"}"></span>${후보표(t.내용)}<b>${할일이름(t.내용)}</b> ${칩들(t.걸린규칙)}
+        <div class="m" style="padding-left:14px">${esc(t.담당자||"담당자 없음")} · 마감 ${t.마감||"없음"} · 지금 ${esc(t.상태)}</div></div>`).join("")}
+      ${멈춤.length?`<div class="row" style="margin-top:8px"><button class="btn pri sm" onclick="보기('inbox')">③ 승인함에서 처리하기</button></div>`:""}</div>`;
+}
+
+/* ③ 승인함 */
+async function 승인함그리기(){
+  await 배지();
+  if(!대기.length){$("#pendingList").innerHTML=`<div class="empty">대기 중인 건이 없습니다.</div>`;$("#pendingDetail").innerHTML="";return}
+  if(!선택 || !대기.some(x=>x.할일id===선택)) 선택 = 대기[0].할일id;
+  $("#pendingList").innerHTML = 대기.map(x=>{const p=x["에이전트의 판단"];return `<div class="item ${x.할일id===선택?"on":""}" onclick="고르기('${x.할일id}')">
+    <div class="t">${후보표(p["할 일"])}${할일이름(p["할 일"])}</div>
+    <div class="m">${esc(p.담당자||"담당자 없음")} · 마감 ${p.마감||"없음"} · ${x.회의id}</div>
+    <div style="margin-top:4px">${칩들(x["멈춘 이유"].map(r=>r.규칙))}</div></div>`}).join("");
+  한건그리기(선택);
+}
+function 고르기(tid){선택=tid;승인함그리기()}
+/* 검수 블록 — v2: 일곱 질문 · 문제라고 한 답은 근거 줄 인용 · 인용이 확인된 것만 「인정」. v1(네 질문) 기록도 그대로 읽는다 */
+function 검수그리기(검, 인정, 신호){
+  if(!검) return '<div class="m">검수 없음 (할 일 후보는 뽑기가 빠뜨린 줄을 코드가 찾은 것이라 검수를 거치지 않았습니다)</div>';
+  if(검.답없음) return `<div class="q"><span class="n">답 없음</span><span>검수 LLM 이 이 건에 답하지 않았습니다 → 안전하게 멈춤</span></div>`;
+  const 인 = new Set(인정||[]);
+  const 줄 = (문제, 말, 인용, 키) => `<div class="q"><span class="${문제?"n":"y"}">${문제?"문제":"맞음"}</span><span>${말}${
+      문제&&인용?` — 「${esc(인용)}」`:""}${문제?(인.has(키)?' <b style="color:var(--bad)">· 인용 확인됨 → 멈춤</b>':' <span style="color:var(--muted)">· 인용이 근거에 없어 인정 안 함</span>'):""}</span></div>`;
+  let h;
+  if(검.확정!==undefined){   // v1 기록
+    h = [["담당자","담당자 · 역할이 근거와 맞나"],["마감","마감이 근거 표현과 맞나"],["근거","근거에 이 할 일이 있나"],["확정","확정된 할 일인가"]]
+        .map(([k,말])=>`<div class="q"><span class="${검[k]?"y":"n"}">${검[k]?"예":"아니오"}</span><span>${말}</span></div>`).join("");
+  } else {
+    h = 줄(검.담당자===false,"① 담당자가 근거 · 역할과 맞나 (부탁이면 부탁받은 사람)",검.담당자_인용,"담당자")
+      + 줄(검.마감===false,"② 마감이 근거 표현과 맞나",검.마감_인용,"마감")
+      + 줄(검.근거===false,"③ 근거에 이 할 일이 있나","","근거")
+      + [["끝난일","④ 이미 끝난 일인가"],["다음기수","④ 다음 기수 이야기인가"],["제안만","④ 제안 · 의견에 그쳤나"],["조건미충족","④ 조건이 아직 안 된 일인가"]]
+          .map(([k,말])=>줄(검[k]===true,말,검.상태_인용,k)).join("");
+  }
+  const 신 = (신호||[]).length ? `<div class="m" style="margin-top:6px">코드가 검수에 넘긴 신호 (신호만으로는 멈추지 않음): ${신호.map(esc).join(" / ")}</div>` : "";
+  return h + (검.이유?`<div class="m" style="margin-top:4px">검수 의견: ${esc(검.이유)}</div>`:"") + 신;
+}
+const 후보설명 = {
+  새할일: "뽑기 단계가 빠뜨린 줄을 대조 단계가 「새 할 일」 이라고 봤습니다. 두 LLM 이 엇갈렸으니 사람이 정합니다.",
+  할일아님: "어느 할 일 근거에도 없던 줄입니다. 대조 단계는 「할 일 아님」 이라고 봤지만, 빠뜨렸을 수 있어 보여 드립니다.",
+  답없음: "어느 할 일 근거에도 없던 줄인데, 대조 단계가 이 줄에 답하지 않았습니다.",
+};
+async function 한건그리기(tid){
+  const x = await api(`/api/pending/${tid}`), p = x["에이전트의 판단"], 검 = x["근거와 검수"];
+  const 담당없음 = !p.담당자;
+  const 후보 = p["할 일 후보(뽑기에서 빠짐)"];
+  const 검문제 = 검 && !검.답없음 && ["담당자","마감","근거","확정"].some(k=>검[k]===false);
+  const 담당근거 = {이름:"근거에 이름이 나옴",제가:"본인이 「제가」 라고 맡음",부탁받음:"부탁받아 맡음",추정:"추정"}[p["담당 근거"]];
+  // 순서: ① 결정할 것(판단 · 승인하면 일어나는 일) → 답 버튼 → ② 왜 멈췄나 → ③ 근거(요청 원문 · 이어진 할 일) → ④ 검수(접어 둠)
+  $("#pendingDetail").innerHTML = `<div class="detail">
+    <div class="blk">
+      <div class="small" style="margin-bottom:10px">${x.할일id} · ${x.회의id} ${esc(x.제목)} (${x.회의일}) · ${x.대기분}분 대기</div>
+      ${후보?`<div class="m" style="margin-bottom:10px"><span class="tag">후보</span>${esc(후보설명[p["후보 종류"]] || "줄 분류는 할 일이라고 했는데 뽑기 단계가 빠뜨린 줄입니다.")} 할 일이면 담당자 · 마감을 넣어 「수정 후 승인」, 아니면 「반려」.</div>`:""}
+      <div class="k">에이전트의 판단</div>
+      <div class="judge"><span>할 일</span><b>${할일이름(p["할 일"])}</b>
+        <span>담당자</span><b>${얼굴(p.담당자)}</b>
+        <span>마감</span><b>${p.마감||"없음"}${p["회의록의 마감 표현"]?` <span class="m" style="font-weight:400">「${esc(p["회의록의 마감 표현"])}」</span>`:""}</b></div>
+      ${p["코드가 고친 마감"]?`<div class="small" style="margin-top:6px">마감은 코드가 고침 — LLM 값 ${esc(p["코드가 고친 마감"]["LLM 값"]||"없음")} → 날짜 도구로 다시 계산해 ${esc(p["코드가 고친 마감"]["고친 값"])}</div>`:""}
+      <div class="effect ${담당없음?"none":""}"><span class="m">승인하면 — </span>${esc(String(x["승인하면 일어나는 일"]).replaceAll("(할 일 후보 · 뽑기에서 빠짐) ",""))}</div>
+    </div>
+    <div class="blk" style="padding-top:12px"><div class="row">
+      <button class="btn ok" id="bApprove" ${담당없음?"disabled":""}>승인</button>
+      <button class="btn" id="bEdit">수정 후 승인</button>
+      <button class="btn bad" id="bReject">반려</button></div>
+      ${담당없음?'<div class="err">담당자가 없어 그대로 승인할 수 없습니다. 「수정 후 승인」 으로 담당자를 정하세요.</div>':""}
+      <div class="form" id="fEdit">
+        <label for="eContent">할 일</label><input id="eContent" value="${esc(String(p["할 일"]||"").replace(/^\(할 일 후보 · 뽑기에서 빠짐\)\s*/, ""))}">
+        <label for="eOwner">담당자</label><select id="eOwner"><option value="">— 고르기 —</option>${[...new Set([...x.참석자, ...(x.팀||[]), ...(p.담당자?[p.담당자]:[])])].map(n=>`<option ${n===p.담당자?"selected":""}>${esc(n)}</option>`).join("")}<option value="__other">직접 입력…</option></select>
+        <input id="eOwnerOther" aria-label="담당자 이름 직접 입력" placeholder="담당자 이름" style="display:none;margin-top:6px">
+        <label for="eDue">마감</label><input id="eDue" type="date" value="${p.마감||""}">
+        <label for="eWhy">고친 이유 (선택)</label><input id="eWhy" placeholder="예: 마감을 날짜로 정함">
+        <div class="err" id="eErr"></div><div class="row" style="margin-top:8px"><button class="btn pri" id="bEditGo">이렇게 고쳐서 등록</button></div></div>
+      <div class="form" id="fReject"><label for="rWhy">반려 사유 (꼭 적기 — 나중에 왜 막았는지 추적하고 기준을 고칠 재료)</label><textarea id="rWhy" placeholder="예: 할 일이 아니라 다음 기수 이야기"></textarea>
+        <div class="err" id="rErr"></div><div class="row" style="margin-top:8px"><button class="btn bad" id="bRejectGo">반려하기</button></div></div>
+    </div>
+    <div class="blk"><div class="k">왜 멈췄나</div>${x["멈춘 이유"].map(r=>`<div class="why"><b>${esc(r.규칙)}</b> ${esc(r.뜻)}${r["업무 정책"]?' <span class="chip">업무 정책 — 맞게 뽑혀도 대표가 봄</span>':""}
+      <div class="w">막으려는 위험: ${esc(r["막으려는 위험"])}</div>${r.규칙==="I15"&&p["같은 일(앞 건)"]?`<div class="w">같은 일로 본 앞 건: ${p["같은 일(앞 건)"]}번째 할 일 — ${esc(p["중복 이유"]||"")}</div>`:""}</div>`).join("")}</div>
+    <div class="blk"><div class="k">요청 원문 — 회의록에서 이 할 일이 나온 줄</div>${x["요청 원문"].map(l=>`<div class="quote">${esc(l)}</div>`).join("")}
+      ${담당근거&&!후보?`<div class="small" style="margin-top:6px">담당 근거: ${esc(담당근거)}${p["담당 인용"]?` 「${esc(p["담당 인용"])}」`:""}${p["연락 대상"]&&p["연락 대상"]!=="없음"?` · 연락 대상: ${esc(p["연락 대상"])}${p["연락 인용"]?` 「${esc(p["연락 인용"])}」`:""}`:""}</div>`:""}
+      ${(x["관련 건"]||[]).length?`<div class="m" style="margin:12px 0 2px">이 줄과 이어진 다른 할 일 — 같은 일이면 「반려」 (두 번 등록 · 두 번 알림 방지)</div>${x["관련 건"].map(r=>`<div class="rel"><b>${할일이름(r["할 일"])}</b> <span class="m">${esc(r.담당자||"담당자 없음")} · 마감 ${esc(r.마감||"없음")} · 지금 ${esc(r.상태)} · ${esc(r.할일id)}</span></div>`).join("")}`:""}
+      <details style="margin-top:8px"><summary class="m">회의록 전체 보기</summary><div class="ctx">${x.회의록.map(l=>`<div class="${l.근거?"hit":""}">${esc(l.줄)}</div>`).join("")}</div></details></div>
+    <div class="blk" style="padding-bottom:0"><details ${검문제||(검&&검.답없음)?"open":""}><summary class="k" style="display:inline">검수 — 다른 LLM 이 원문과 대조한 네 질문 ${검?(검.답없음?"· 답 없음":검문제?"· 아니오 있음":"· 모두 예"):"· 없음"}</summary>
+      <div style="margin-top:6px">${검수그리기(검, x["인정된 아니오"], x["검수 신호"])}</div></details></div>
+    </div>`;
+  $("#bApprove").onclick = ()=>답("승인", "", {});
+  $("#bEdit").onclick = ()=>{$("#fEdit").classList.toggle("on");$("#fReject").classList.remove("on")};
+  $("#bReject").onclick = ()=>{$("#fReject").classList.toggle("on");$("#fEdit").classList.remove("on");$("#rWhy").focus()};
+  $("#eOwner").onchange = e=>{$("#eOwnerOther").style.display = e.target.value==="__other"?"block":"none"};
+  ["eContent","eOwner","eOwnerOther","eDue"].forEach(id=>$("#"+id).oninput=()=>$("#eErr").textContent="");
+  $("#rWhy").oninput = ()=>$("#rErr").textContent="";
+  if(열폼==="edit") $("#fEdit").classList.add("on");
+  if(열폼==="reject") $("#fReject").classList.add("on");
+  열폼 = null;
+  $("#bEditGo").onclick = ()=>{
+    const 담 = $("#eOwner").value==="__other" ? $("#eOwnerOther").value.trim() : $("#eOwner").value;
+    const 내용 = $("#eContent").value.trim();
+    if(!내용){$("#eErr").textContent="할 일을 적으세요.";return}
+    if(!담){$("#eErr").textContent="담당자를 정하세요. 담당자 없이 등록하면 아무도 알림을 받지 못합니다.";return}
+    // 사람이 넣은 값도 확인한다 (09-28 사람 처리에서 담당자 칸에 설명 문장 · 회의일보다 앞선 마감이 그대로 등록됨) — 막지 않고 묻기
+    const 사람들 = new Set([...x.참석자, ...(x.팀||[])]);
+    const 마감 = $("#eDue").value||null;
+    const 걱정 = [];
+    if(!사람들.has(담)) 걱정.push(`담당자 「${담}」 은(는) 참석자 · 팀 명단(${[...사람들].join(", ")})에 없습니다. 이 사람에게 알림이 갑니다.`);
+    if(마감 && 마감 < x.회의일) 걱정.push(`마감 ${마감} 이 회의일 ${x.회의일} 보다 앞입니다 (이미 지난 날짜).`);
+    if(걱정.length && !confirm(걱정.join("\n") + "\n\n그래도 이대로 등록할까요? (할 일이 아니면 「반려」)")) return;
+    답("수정 후 승인", $("#eWhy").value.trim(), {내용, 담당자:담, 마감});
+  };
+  $("#bRejectGo").onclick = ()=>{const 사유=$("#rWhy").value.trim(); if(!사유){$("#rErr").textContent="반려 사유를 적으세요.";return} 답("반려", 사유, {})};
+}
+async function 답(결정, 사유, 수정){
+  try{const r = await api(`/api/answer/${선택}`, {method:"POST", body:JSON.stringify({결정, 사유, 수정})});
+    toast(결정==="반려" ? "반려했습니다. 등록하지 않고 사유를 남겼습니다." : `${r.상태} — 업무 보드에 올리고 담당자에게 알림을 보냈습니다.`);
+    선택 = null; 승인함그리기();
+  }catch(e){toast(e.message,true)}
+}
+$("#expire").onclick = async ()=>{const r=await api("/api/expire",{method:"POST"});toast(r["자동 반려"].length?`${r["자동 반려"].length}건을 자동 반려하고 주최자에게 알렸습니다.`:"3일 넘게 대기한 건이 없습니다.");승인함그리기()};
+
+/* ④ 결과 */
+async function 결과그리기(){
+  const r = await api("/api/results"); 배지();
+  const 세 = r.세기, 사람 = 세["승인"] + 세["수정 후 승인"] + 세["반려"];
+  const 시각 = s => String(s||"").replace("T"," ").slice(5,16);   // 09-28 23:08
+  $("#tiles").innerHTML = [
+    ["", 세["처리한 할 일"], "처리한 할 일", ""],
+    ["auto", 세["자동 등록"], "자동 등록", "사람 없이 끝까지"],
+    ["", 사람, "사람이 처리", `승인 ${세["승인"]} · 수정 후 승인 ${세["수정 후 승인"]} · 반려 ${세["반려"]}`],
+    ["stop", 세["대기 중"], "대기 중", "체크포인터에 보관"],
+  ].map(([c,n,l,s])=>`<div class="tile ${c}"><div class="n">${n}</div><div class="l">${l}</div>${s?`<div class="s">${s}</div>`:""}</div>`).join("");
+  $("#boardCnt").textContent = `${r.보드.length}건 · 바깥으로 나간 결과`;
+  $("#decCnt").textContent = `${r.답.length}건`;
+  $("#outCnt").textContent = `${r.알림.length}건 · 되돌릴 수 없는 것`;
+  $("#boardTbl").innerHTML = `<tr><th class="nw">할 일 id</th><th>할 일</th><th class="nw">담당자</th><th class="nw">마감</th><th class="nw">등록</th><th class="nw">시각</th></tr>` +
+    (r.보드.map(b=>`<tr><td class="nw small">${b.할일id}</td><td>${후보표(b.내용)}${할일이름(b.내용)}</td><td class="nw">${esc(b.담당자||"-")}</td><td class="nw">${b.마감||"-"}${b.마감_고침?`<div class="small">코드가 고침 (LLM ${esc(b.마감_LLM||"없음")})</div>`:""}</td><td class="nw"><span class="dot ${b.등록방식==="자동"?"auto":"stop"}"></span>${esc(b.등록방식)}</td><td class="nw small">${시각(b.등록시각)}</td></tr>`).join("") || `<tr><td colspan="6" class="m">아직 없습니다</td></tr>`);
+  $("#decTbl").innerHTML = `<tr><th class="nw">할 일 id</th><th class="nw">결정</th><th>사유</th><th>고친 것</th><th class="nw">시각</th></tr>` +
+    (r.답.map(d=>`<tr><td class="nw small">${d.할일id}</td><td class="nw"><span class="dot ${d.결정==="반려"?"bad":"auto"}"></span>${esc(d.결정)}</td><td>${esc(d.사유||"-")}</td><td class="m">${esc(Object.entries(d.수정||{}).filter(([k])=>k!=="내용").map(([k,v])=>`${k} ${v??"없음"}`).join(" · ")||"-")}</td><td class="nw small">${시각(d.시각)}</td></tr>`).join("") || `<tr><td colspan="5" class="m">아직 없습니다</td></tr>`);
+  $("#rejTbl").innerHTML = `<tr><th class="nw">할 일 id</th><th>할 일</th><th class="nw">멈춘 규칙</th><th>반려 사유</th></tr>` +
+    ((r.반려모음||[]).map(d=>`<tr><td class="nw small">${d.할일id}</td><td>${후보표(d["할 일"])}${할일이름(d["할 일"]||"-")}</td><td class="nw">${d["멈춘 규칙"].map(칩).join("")||"-"}</td><td>${esc(d.사유)}</td></tr>`).join("") || `<tr><td colspan="4" class="m">아직 없습니다</td></tr>`);
+  $("#outTbl").innerHTML = `<tr><th class="nw">할 일 id</th><th class="nw">받는 사람</th><th>알림</th><th class="nw">시각</th></tr>` +
+    (r.알림.map(o=>`<tr><td class="nw small">${o.할일id}</td><td class="nw">${esc(o.받는사람)}</td><td>${esc(String(o.알림).replace(후보머리말,""))}</td><td class="nw small">${시각(o.시각)}</td></tr>`).join("") || `<tr><td colspan="4" class="m">아직 없습니다</td></tr>`);
+}
+
+/* 주소 바로가기 — #inbox · #results · #room=M3 · #inbox&id=M1-T03 · #inbox&form=edit|reject (화면 캡처 · 링크 공유용) */
+let 열폼 = null;
+function 주소로열기(){
+  const 칸 = Object.fromEntries(location.hash.slice(1).split("&").filter(Boolean).map(x=>{const [k,v]=x.split("=");return [k, v===undefined?"":decodeURIComponent(v)]}));
+  if("room" in 칸 && 칸.room) 방 = 칸.room;
+  if(칸.id) 선택 = 칸.id;
+  열폼 = 칸.form || null;
+  const 탭 = ["meetings","room","inbox","results"].find(k=>k in 칸) || "meetings";
+  보기(탭);
+  배지();
+  // 캡처용: &hide=표id(쉼표로 여럿) 는 그 표와 제목을 감춤 · &end 는 회의실을 재생 끝(지금 상태)으로
+  (칸.hide||"").split(",").filter(Boolean).forEach(id=>{const 표=document.getElementById(id); if(표) (표.closest("details") || 표).style.display="none";});
+  if("end" in 칸) setTimeout(()=>window.회의실3D?.끝으로(), 2500);
+  if(칸.t) setTimeout(()=>{window.회의실3D?.재생(); window.회의실3D?.손으로(+칸.t); window.회의실3D?.잠깐();}, 2500);   // 그 시각의 장면 (캡처용)
+}
+window.addEventListener("hashchange", 주소로열기);
+(async()=>{try{if((await api("/api/config")).공개)document.body.classList.add("public")}catch(e){}
+  (await api("/api/rules")).forEach(r=>규칙[r.규칙]=r);주소로열기()})();
+let 배속 = 1;
+$("#play").onclick = ()=>window.회의실3D?.재생();
+$("#pause").onclick = ()=>window.회의실3D?.잠깐();
+$("#speed").onclick = ()=>{배속 = 배속===1?2:배속===2?4:1; $("#speed").textContent=`${배속}배`; window.회의실3D?.속도바꾸기(배속)};
+$("#skip").onclick = ()=>window.회의실3D?.끝으로();
+</script>
+<script type="module">
+// 3D 는 three.js 를 인터넷(jsdelivr)에서 받는다. 받지 못하면 2D 진행 기록만 보인다 (화면은 그대로 동작)
+try {
+  window.회의실3D = await import('/static/js/room3d.js');
+  if (document.querySelector('#room').classList.contains('on')) 회의실그리기();
+} catch (e) {
+  document.querySelector('#stage3d').innerHTML = '<div class="empty" style="margin:20px">3D 를 불러오지 못했습니다 (인터넷 연결 필요). 아래 2D 진행 기록은 그대로 볼 수 있습니다.</div>';
+}
+</script>
+</body>
+</html>
